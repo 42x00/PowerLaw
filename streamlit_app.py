@@ -1,16 +1,10 @@
-from glob import glob
-
-import pandas as pd
 import powerlaw
+import pandas as pd
 import streamlit as st
 import plotly.express as px
 from streamlit_extras.dataframe_explorer import dataframe_explorer
 
 st.set_page_config(layout='wide')
-st.sidebar.title('PowerLaw')
-st.sidebar.caption('Options')
-add_filter = st.sidebar.checkbox('Add filter')
-left, right = st.columns(2)
 
 
 def preprocess(df, column, groupby='', top_n=-1):
@@ -26,23 +20,27 @@ def preprocess(df, column, groupby='', top_n=-1):
     return data
 
 
+left, right = st.columns(2)
+
 with left:
-    csv_paths = [''] + sorted(glob('data/**/*.csv', recursive=True))
-    csv_path = st.selectbox('File', csv_paths, format_func=lambda x: x[5:-4])
-    if csv_path == '':
+    uploaded_file = st.file_uploader("File")
+    if uploaded_file is None:
         st.stop()
-    df = pd.read_csv(csv_path)
-    if add_filter:
-        df = dataframe_explorer(df)
-    st.dataframe(df, use_container_width=True)
+    df = pd.read_csv(uploaded_file)
+
+    placeholder = st.empty()
 
     column = st.selectbox('Column', [''] + list(df.columns))
+
+    with st.expander('Options'):
+        groupby = st.selectbox('Group by', [''] + list(df.columns))
+        top_n = st.number_input('Top N', value=10000)
+        pl_fit = st.checkbox('PowerLaw Fit')
+        df = dataframe_explorer(df)
+    placeholder.dataframe(df, use_container_width=True)
+
     if column == '':
         st.stop()
-    groupby = st.selectbox('Group by', [''] + list(df.columns))
-
-    with st.expander('Options', expanded=True):
-        top_n = st.number_input('Top N', value=10000)
 
 with right:
     data = preprocess(df, column, groupby, top_n)
@@ -51,7 +49,11 @@ with right:
     fig = px.scatter(**kwargs)
 
     data['Rank'] = data['Rank'] - 0.5
-    kwargs.update(dict(trendline='ols', trendline_options=dict(log_x=True, log_y=True)))
+    if pl_fit:
+        mask = data.groupby(groupby)[column].transform(
+            lambda x: x >= powerlaw.Fit(x, discrete=True, verbose=False).xmin)
+        data = data[mask]
+    kwargs.update(dict(data_frame=data, trendline='ols', trendline_options=dict(log_x=True, log_y=True)))
     ols_fig = px.scatter(**kwargs)
     for trace in ols_fig.data:
         if trace.mode == 'lines':
