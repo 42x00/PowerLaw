@@ -66,7 +66,7 @@ with right:
     if groupby == '':
         ols_results[groupby] = column
     alpha_gab = ols_results.set_index(groupby)['px_fit_results'].apply(
-        lambda x: pd.Series([-x.params[1], x.bse[1], 'gab'])).reset_index()
+        lambda x: pd.Series([-x.params[1] + 1, x.bse[1], 'gab'])).reset_index()
     alpha_pl = data.groupby(groupby).apply(
         lambda x: pd.Series(
             [powerlaw.Fit(x[column], xmin=x[column].min(), discrete=True).alpha, 0, 'pl'])).reset_index()
