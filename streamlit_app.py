@@ -51,7 +51,7 @@ with right:
     data['Rank'] = data['Rank'] - 0.5
     if pl_fit:
         mask = data.groupby(groupby)[column].transform(
-            lambda x: x >= powerlaw.Fit(x, discrete=True, verbose=False).xmin)
+            lambda x: x >= powerlaw.Fit(x, discrete=True, verbose=False).power_law.xmin)
         data = data[mask]
     kwargs.update(dict(data_frame=data, trendline='ols', trendline_options=dict(log_x=True, log_y=True)))
     ols_fig = px.scatter(**kwargs)
@@ -67,9 +67,9 @@ with right:
         ols_results[groupby] = column
     alpha_gab = ols_results.set_index(groupby)['px_fit_results'].apply(
         lambda x: pd.Series([-x.params[1] + 1, x.bse[1], 'gab'])).reset_index()
-    alpha_pl = data.groupby(groupby).apply(
+    alpha_pl = data.groupby(groupby)[column].apply(lambda x: powerlaw.Fit(x, xmin=x.min(), discrete=True)).apply(
         lambda x: pd.Series(
-            [powerlaw.Fit(x[column], xmin=x[column].min(), discrete=True).alpha, 0, 'pl'])).reset_index()
+            [x.power_law.alpha, x.distribution_compare('power_law', 'lognormal')[1], 'pl'])).reset_index()
     alpha_df = pd.concat([alpha_gab, alpha_pl]).rename(columns={0: 'alpha', 1: 'error', 2: 'model'})
     fig = px.scatter(alpha_df, x=groupby, y='alpha', error_y='error', color='model')
     st.plotly_chart(fig, use_container_width=True)
