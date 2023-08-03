@@ -37,7 +37,7 @@ with left:
         top_n = st.number_input('Top N', value=10000)
         pl_fit = st.checkbox('PowerLaw Fit')
         df = dataframe_explorer(df)
-    placeholder.dataframe(df, use_container_width=True)
+    placeholder.dataframe(df.head(1000), use_container_width=True)
 
     if column == '':
         st.stop()
