@@ -85,7 +85,7 @@ with right:
             trace.line.dash = 'dot'
             fig.add_trace(trace)
 
-    tabs = st.tabs(['Main', 'empirical PDF'])
+    tabs = st.tabs(['Log-Rank vs. Log-Size', 'CDF'])
     with tabs[0]:
         st.plotly_chart(fig)
     with tabs[1]:
@@ -93,11 +93,13 @@ with right:
         pdf = pdf.pivot(index=groupby, columns='level_1', values=column).reset_index().explode(['hist', 'bin_edges'])
         pdf = pdf[pdf['hist'] > 0]
         pdf_fig = px.scatter(pdf, x='bin_edges', y='hist', color=groupby, log_x=True, log_y=True, trendline='ols',
-                             trendline_options=dict(log_x=True, log_y=True))
+                             trendline_options=dict(log_x=True, log_y=True),
+                             labels={'hist': 'Probability', 'bin_edges': column})
         for trace in pdf_fig.data:
             if trace.mode == 'lines':
                 trace.line.dash = 'dot'
         st.plotly_chart(pdf_fig)
+        st.caption('Note: 50 bins for each group')
 
     ols_results = px.get_trendline_results(ols_fig)
     if groupby == '':
@@ -105,15 +107,18 @@ with right:
     alpha_gab = ols_results.set_index(groupby)['px_fit_results'].apply(
         lambda x: pd.Series([-x.params[1] + 1, x.bse[1] * 1.96, 'gab'])).reset_index()
     results = data.groupby(groupby)[column].apply(lambda x: powerlaw.Fit(x, xmin=x.min()))
-    r_pl = results.apply(lambda x: x.distribution_compare('power_law', 'lognormal')[0])
+    r_pl = results.apply(lambda x: x.distribution_compare('power_law', 'lognormal')[0]).reset_index()
     alpha_pl = results.apply(lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'pl'])).reset_index()
     alpha_df = pd.concat([alpha_gab, alpha_pl]).rename(columns={0: 'alpha', 1: 'error', 2: 'model'})
-    tabs = st.tabs(['Alpha', 'R'])
+    tabs = st.tabs(['Alpha', 'R', 'Obs'])
     with tabs[0]:
         fig = px.scatter(alpha_df, x=groupby, y='alpha', error_y='error', color='model')
         st.plotly_chart(fig, use_container_width=True)
     with tabs[1]:
-        fig = px.scatter(r_pl)
+        fig = px.scatter(r_pl, x=groupby, y=column, labels={column: 'R'})
         st.plotly_chart(fig, use_container_width=True)
         st.caption(
-            'R: Loglikelihood ratio of the two distributions’ fit to the data. If greater than 0, the first distribution is preferred. If less than 0, the second distribution is preferred.')
+            'R: Loglikelihood ratio of the two distributions’ fit to the data. If greater than 0, the power_law distribution is preferred. If less than 0, the lognormal distribution is preferred.')
+    with tabs[2]:
+        fig = px.scatter(data.groupby(groupby).size().reset_index(), x=groupby, y=0, labels={'0': 'Number of Obs'})
+        st.plotly_chart(fig, use_container_width=True)
