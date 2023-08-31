@@ -77,6 +77,7 @@ with right:
     if pl_fit:
         mask = data.groupby(groupby)[column].transform(
             lambda x: x >= powerlaw.Fit(x, verbose=False).power_law.xmin)
+        data_2nd = data[~mask]
         data = data[mask]
     kwargs.update(dict(data_frame=data, trendline='ols', trendline_options=dict(log_x=True, log_y=True)))
     ols_fig = px.scatter(**kwargs)
@@ -84,6 +85,13 @@ with right:
         if trace.mode == 'lines':
             trace.line.dash = 'dot'
             fig.add_trace(trace)
+    if pl_fit:
+        kwargs['data_frame'] = data_2nd
+        ols_fig_2nd = px.scatter(**kwargs)
+        for trace in ols_fig_2nd.data:
+            if trace.mode == 'lines':
+                trace.line.dash = 'dot'
+                fig.add_trace(trace)
 
     tabs = st.tabs(['Log-Rank vs. Log-Size', 'CDF'])
     with tabs[0]:
@@ -114,6 +122,19 @@ with right:
     with tabs[0]:
         fig = px.scatter(alpha_df, x=groupby, y='alpha', error_y='error', color='model')
         st.plotly_chart(fig, use_container_width=True)
+        if pl_fit:
+            st.caption('Note: 2nd fit is only for the data above the xmin of the 1st fit')
+            ols_results_2nd = px.get_trendline_results(ols_fig_2nd)
+            if groupby == '':
+                ols_results_2nd[groupby] = column
+            alpha_gab_2nd = ols_results_2nd.set_index(groupby)['px_fit_results'].apply(
+                lambda x: pd.Series([-x.params[1] + 1, x.bse[1] * 1.96, 'gab'])).reset_index()
+            results_2nd = data_2nd.groupby(groupby)[column].apply(lambda x: powerlaw.Fit(x, xmin=x.min()))
+            alpha_pl_2nd = results_2nd.apply(
+                lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'pl'])).reset_index()
+            alpha_df_2nd = pd.concat([alpha_gab_2nd, alpha_pl_2nd]).rename(columns={0: 'alpha', 1: 'error', 2: 'model'})
+            fig = px.scatter(alpha_df_2nd, x=groupby, y='alpha', error_y='error', color='model')
+            st.plotly_chart(fig, use_container_width=True)
     with tabs[1]:
         fig = px.scatter(r_pl, x=groupby, y=column, labels={column: 'R'})
         st.plotly_chart(fig, use_container_width=True)
@@ -122,3 +143,8 @@ with right:
     with tabs[2]:
         fig = px.scatter(data.groupby(groupby).size().reset_index(), x=groupby, y=0, labels={'0': 'Number of Obs'})
         st.plotly_chart(fig, use_container_width=True)
+        if pl_fit:
+            st.caption('Note: 2nd fit is only for the data above the xmin of the 1st fit')
+            fig = px.scatter(data_2nd.groupby(groupby).size().reset_index(), x=groupby, y=0,
+                             labels={'0': 'Number of Obs'})
+            st.plotly_chart(fig, use_container_width=True)
