@@ -38,8 +38,9 @@ def preprocess(df, column, groupby='', top_n=-1):
 
 
 def get_hist(x):
-    hist, bin_edges = np.histogram(x, bins=50)
-    return pd.Series({'hist': hist / hist.sum(), 'bin_edges': bin_edges[:-1]})
+    log_bins = np.logspace(np.log10(x.min()), np.log10(x.max()), 50)
+    hist, bin_edges = np.histogram(x, bins=log_bins, density=True)
+    return pd.Series({'hist': hist, 'bin_edges': bin_edges[:-1]})
 
 
 left, right = st.columns(2)
@@ -62,6 +63,10 @@ with left:
         cpi_column = st.selectbox('CPI Column', [''] + list(df.columns))
         if cpi_column != '':
             df[column] /= df[cpi_column].map(st.session_state['cpi'])
+        year2decade = st.checkbox('Year to Decade')
+        if year2decade:
+            df = df.dropna(subset=[groupby])
+            df[groupby] = df[groupby].astype(int) // 10 * 10
     placeholder.dataframe(df, use_container_width=True)
 
     if column == '':
