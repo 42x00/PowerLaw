@@ -56,10 +56,10 @@ with left:
         pl_fit = st.checkbox('PowerLaw Fit')
         df = dataframe_explorer(df)
         cpi_column = st.selectbox('CPI Column', [''] + list(df.columns))
-        if cpi_column != '':
+        if cpi_column != '' and column != '':
             df[column] *= df[cpi_column].map(st.session_state['cpi'])
         year2decade = st.checkbox('Year to Decade')
-        if year2decade:
+        if year2decade and groupby != '':
             df = df.dropna(subset=[groupby])
             df[groupby] = df[groupby].astype(int) // 10 * 10
     placeholder.dataframe(df, use_container_width=True)
@@ -108,6 +108,19 @@ with right:
                 trace.line.dash = 'dot'
         st.plotly_chart(pdf_fig)
         st.caption('Note: 50 bins for each group')
+        if pl_fit:
+            pdf_2nd = data_2nd.groupby(groupby)[column].apply(get_hist).reset_index()
+            pdf_2nd = pdf_2nd.pivot(index=groupby, columns='level_1', values=column).reset_index().explode(
+                ['hist', 'bin_edges'])
+            pdf_2nd = pdf_2nd[pdf_2nd['hist'] > 0]
+            pdf_fig_2nd = px.scatter(pdf_2nd, x='bin_edges', y='hist', color=groupby, log_x=True, log_y=True,
+                                     trendline='ols', trendline_options=dict(log_x=True, log_y=True),
+                                     labels={'hist': 'Probability', 'bin_edges': column})
+            for trace in pdf_fig_2nd.data:
+                if trace.mode == 'lines':
+                    trace.line.dash = 'dot'
+            st.plotly_chart(pdf_fig_2nd)
+            st.caption('Note: 2nd fit is only for the data above the xmin of the 1st fit')
 
     ols_results = px.get_trendline_results(ols_fig)
     if groupby == '':
