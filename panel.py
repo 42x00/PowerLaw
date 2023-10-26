@@ -17,7 +17,7 @@ def compare_distributions(x):
         return np.nan
 
 
-def get_results(df, suffix=''):
+def get_results(df, suffix):
     ret = dict()
     # gab
     gab_df = px.get_trendline_results(
@@ -50,7 +50,7 @@ for i, row in panel.iterrows():
 
     # df
     df = pd.read_csv(filepath)[[groupby, column]]
-    df[groupby] = df[groupby].astype(str)
+    df[groupby] = df[groupby].astype(str).apply(lambda x: x.replace('q', ''))
     df[column] = df[column].astype(float)
     df = df[df[column] > 0]
     df = df.sort_values(by=[groupby, column], ascending=[True, False])
@@ -59,13 +59,28 @@ for i, row in panel.iterrows():
     # year
     result['period'] = len(df[groupby].unique())
 
+    # count
+    count_df = df.groupby(groupby).count()
+    result['obs_trend'] = get_slope(count_df)
+    result['obs_mean'] = count_df[column].mean()
+
     # max
     max_df = df.groupby(groupby).max()
+    result['max_first'] = max_df[column].iloc[0]
+    result['max_last'] = max_df[column].iloc[-1]
     result['max_trend'] = get_slope(max_df)
     result['max_mean'] = max_df[column].mean()
 
     # gab, pl, r
-    result.update(get_results(df))
+    result.update(get_results(df, suffix=''))
+
+    # fix_n
+    N = int(count_df[column].quantile(0.5) // 100 * 100)
+    result['n'] = N
+    ndf = df.groupby(groupby).filter(lambda x: len(x) >= N)
+    ndf = ndf.groupby(groupby)[column].nlargest(N).droplevel(1).reset_index()
+    ndf['rank'] = ndf.groupby(groupby).cumcount() + 0.5
+    result.update(get_results(ndf, suffix='_n'))
 
     # xmin
     df = df.groupby(groupby)[column].nlargest(10000).droplevel(1).reset_index()
@@ -76,10 +91,10 @@ for i, row in panel.iterrows():
     result['xmin_trend'] = get_slope(xmin_df)
     result['xmin_mean'] = xmin_df[column].mean()
 
-    # obs
+    # obs_fit
     obs_df = df.groupby(groupby).count()
-    result['obs_trend'] = get_slope(obs_df)
-    result['obs_mean'] = obs_df[column].mean()
+    result['obs_fit_trend'] = get_slope(obs_df)
+    result['obs_fit_mean'] = obs_df[column].mean()
 
     # gab_fit, pl_fit, r_fit
     result.update(get_results(df, suffix='_fit'))

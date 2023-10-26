@@ -2,3 +2,5 @@
 .idea
 tmp*
 data
+workspace
+backup
