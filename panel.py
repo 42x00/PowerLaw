@@ -38,7 +38,7 @@ def get_results(df, suffix):
     return ret
 
 
-path = '/Users/ykli/Downloads/panel.csv'
+path = './data/data_for_book/Power Law Distribution Panel Data Inequality Trend Summary.csv'
 panel = pd.read_csv(path)
 
 for i, row in panel.iterrows():
@@ -49,7 +49,7 @@ for i, row in panel.iterrows():
     result = dict()
 
     # df
-    df = pd.read_csv(filepath)[[groupby, column]]
+    df = pd.read_csv(filepath)[[groupby, column]].dropna(subset=[groupby])
     df[groupby] = df[groupby].astype(str).apply(lambda x: x.replace('q', ''))
     df[column] = df[column].astype(float)
     df = df[df[column] > 0]
@@ -57,10 +57,15 @@ for i, row in panel.iterrows():
     df['rank'] = df.groupby(groupby).cumcount() + 0.5
 
     # year
-    result['period'] = len(df[groupby].unique())
+    periods = sorted(df[groupby].unique())
+    result['period'] = len(periods)
+    result['period_first'] = periods[0]
+    result['period_last'] = periods[-1]
 
     # count
     count_df = df.groupby(groupby).count()
+    if len(count_df) < 2:
+        continue
     result['obs_trend'] = get_slope(count_df)
     result['obs_mean'] = count_df[column].mean()
 
@@ -75,7 +80,10 @@ for i, row in panel.iterrows():
     result.update(get_results(df, suffix=''))
 
     # fix_n
-    N = int(count_df[column].quantile(0.5) // 100 * 100)
+    N = count_df[column].quantile(0.5)
+    N = int(N // 100 * 100) if N > 100 else int(N)
+    if N < 5:
+        continue
     result['n'] = N
     ndf = df.groupby(groupby).filter(lambda x: len(x) >= N)
     ndf = ndf.groupby(groupby)[column].nlargest(N).droplevel(1).reset_index()
