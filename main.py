@@ -131,6 +131,7 @@ with right:
     r_pl = results.apply(lambda x: x.distribution_compare('power_law', 'lognormal')[0]).reset_index()
     alpha_pl = results.apply(lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'pl'])).reset_index()
     alpha_df = pd.concat([alpha_gab, alpha_pl]).rename(columns={0: 'alpha', 1: 'error', 2: 'model'})
+    alpha_df.to_csv('alpha.csv', index=False)
     tabs = st.tabs(['Alpha', 'R', 'Obs'])
     with tabs[0]:
         fig = px.scatter(alpha_df, x=groupby, y='alpha', error_y='error', color='model')
