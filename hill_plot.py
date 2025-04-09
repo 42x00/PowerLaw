@@ -5,6 +5,8 @@ import streamlit as st
 import plotly.express as px
 import statsmodels.api as sm
 
+st.set_page_config(layout="wide")
+
 def estimate_power_law_alpha(data):
     """
     Estimate the power-law exponent alpha using the Gabaix rank-1/2 method.
@@ -46,49 +48,57 @@ def estimate_power_law_alpha(data):
 
 st.title('Hill Plot App')
 
-uploaded_file = st.file_uploader("File")
-if uploaded_file is None:
-    st.stop()
-df = pd.read_csv(uploaded_file)
-st.dataframe(df, use_container_width=True)
+left, right = st.columns(2)
 
-column = st.selectbox('Column', [''] + list(df.columns))
-if column == '':
-    st.stop()
+with left:
+    uploaded_file = st.file_uploader("File")
+    if uploaded_file is None:
+        st.stop()
+    df = pd.read_csv(uploaded_file)
+    st.dataframe(df, use_container_width=True)
 
-data = df[column].values
-data = data[data > 0]
+    column = st.selectbox('Column', [''] + list(df.columns))
+    if column == '':
+        st.stop()
 
-# Step 2: Sort data in descending order
-data_sorted = np.sort(data)[::-1]  # X_{(1)} >= X_{(2)} >= ... >= X_{(n)}
-n_samples = len(data_sorted)
+    log_x = st.checkbox('Log X-axis', value=False)
 
-# Step 3: Compute Hill estimator for various k values
-k_values = np.arange(10, n_samples // 2 + 1, 10)  # Range of k from 10 to n/2, step 10
-alpha_hill = []
-alpha_clauset = []
-alpha_gabaix = []
+    data = df[column].values
+    data = data[data > 0]
 
-for k in k_values:
-    top_k = data_sorted[:k]       # Top k order statistics
-    X_k1 = data_sorted[k]         # X_{(k+1)}, the (k+1)th order statistic
-    log_terms = np.log(top_k / X_k1)  # Log ratios
-    alpha_hat = k / np.sum(log_terms)  # Hill estimator formula
-    alpha_hill.append(alpha_hat)
+    # Step 2: Sort data in descending order
+    data_sorted = np.sort(data)[::-1]  # X_{(1)} >= X_{(2)} >= ... >= X_{(n)}
+    n_samples = len(data_sorted)
 
-    fit = pl.Fit(top_k, xmin=X_k1)
-    alpha_clauset.append(fit.alpha - 1)
+    # Step 3: Compute Hill estimator for various k values
+    k_values = np.arange(10, n_samples // 2 + 1, 10)  # Range of k from 10 to n/2, step 10
+    alpha_hill = []
+    alpha_clauset = []
+    alpha_gabaix = []
 
-    alpha_gabaix.append(estimate_power_law_alpha(top_k)[0])
+    for k in k_values:
+        top_k = data_sorted[:k]       # Top k order statistics
+        X_k1 = data_sorted[k]         # X_{(k+1)}, the (k+1)th order statistic
+        log_terms = np.log(top_k / X_k1)  # Log ratios
+        alpha_hat = k / np.sum(log_terms)  # Hill estimator formula
+        alpha_hill.append(alpha_hat)
 
-result = pd.DataFrame({
-    'k': k_values,
-    'Hill Estimator': alpha_hill,
-    'Clauset Estimator': alpha_clauset,
-    'Gabaix Estimator': alpha_gabaix
-})
+        fit = pl.Fit(top_k, xmin=X_k1)
+        alpha_clauset.append(fit.alpha - 1)
 
-# Step 4: Plotting the results
-fig = px.line(result, x='k', y=['Hill Estimator', 'Clauset Estimator', 'Gabaix Estimator'], labels={'value': 'α'})
+        alpha_gabaix.append(estimate_power_law_alpha(top_k)[0])
 
-st.plotly_chart(fig)
+    result = pd.DataFrame({
+        'k': k_values,
+        'Hill Estimator': alpha_hill,
+        'Clauset Estimator': alpha_clauset,
+        'Gabaix Estimator': alpha_gabaix
+    })
+
+    # Step 4: Plotting the results
+    fig = px.line(result, x='k', y=['Hill Estimator', 'Clauset Estimator', 'Gabaix Estimator'], 
+                  labels={'value': 'α'}, log_x=log_x)
+
+
+with right:
+    st.plotly_chart(fig)
