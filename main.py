@@ -62,6 +62,7 @@ with left:
         if year2decade and groupby != '':
             df = df.dropna(subset=[groupby])
             df[groupby] = df[groupby].astype(int) // 10 * 10
+        log_rank_size = st.checkbox('Log-Rank vs. Log-Size', value=True)
     placeholder.dataframe(df, use_container_width=True)
 
     if column == '':
@@ -70,7 +71,7 @@ with left:
 with right:
     data = preprocess(df, column, groupby, top_n)
 
-    kwargs = dict(data_frame=data, x=column, y='Rank', color=groupby, log_x=True, log_y=True, opacity=0.5)
+    kwargs = dict(data_frame=data, x=column, y='Rank', color=groupby, log_x=log_rank_size, log_y=log_rank_size, opacity=0.5)
     fig = px.scatter(**kwargs)
 
     data['Rank'] = data['Rank'] - 0.5
@@ -93,7 +94,7 @@ with right:
                 trace.line.dash = 'dot'
                 fig.add_trace(trace)
 
-    tabs = st.tabs(['Log-Rank vs. Log-Size', 'PDF'])
+    tabs = st.tabs(['Rank vs. Size', 'PDF'])
     with tabs[0]:
         st.plotly_chart(fig)
     with tabs[1]:
@@ -126,10 +127,10 @@ with right:
     if groupby == '':
         ols_results[groupby] = column
     alpha_gab = ols_results.set_index(groupby)['px_fit_results'].apply(
-        lambda x: pd.Series([-x.params[1] + 1, x.bse[1] * 1.96, 'gab'])).reset_index()
+        lambda x: pd.Series([-x.params[1] + 1, x.bse[1] * 1.96, 'Gabaix'])).reset_index()
     results = data.groupby(groupby)[column].apply(lambda x: powerlaw.Fit(x, xmin=x.min()))
     r_pl = results.apply(lambda x: x.distribution_compare('power_law', 'lognormal')[0]).reset_index()
-    alpha_pl = results.apply(lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'pl'])).reset_index()
+    alpha_pl = results.apply(lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'Clauset'])).reset_index()
     alpha_df = pd.concat([alpha_gab, alpha_pl]).rename(columns={0: 'alpha', 1: 'error', 2: 'model'})
     alpha_df.to_csv('alpha.csv', index=False)
     tabs = st.tabs(['Alpha', 'R', 'Obs'])
@@ -142,10 +143,10 @@ with right:
             if groupby == '':
                 ols_results_2nd[groupby] = column
             alpha_gab_2nd = ols_results_2nd.set_index(groupby)['px_fit_results'].apply(
-                lambda x: pd.Series([-x.params[1] + 1, x.bse[1] * 1.96, 'gab'])).reset_index()
+                lambda x: pd.Series([-x.params[1] + 1, x.bse[1] * 1.96, 'Gabaix'])).reset_index()
             results_2nd = data_2nd.groupby(groupby)[column].apply(lambda x: powerlaw.Fit(x, xmin=x.min()))
             alpha_pl_2nd = results_2nd.apply(
-                lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'pl'])).reset_index()
+                lambda x: pd.Series([x.power_law.alpha, x.power_law.sigma * 1.96, 'Clauset'])).reset_index()
             alpha_df_2nd = pd.concat([alpha_gab_2nd, alpha_pl_2nd]).rename(columns={0: 'alpha', 1: 'error', 2: 'model'})
             fig = px.scatter(alpha_df_2nd, x=groupby, y='alpha', error_y='error', color='model')
             st.plotly_chart(fig, use_container_width=True)
