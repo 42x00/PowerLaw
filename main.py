@@ -98,7 +98,7 @@ with right:
     tabs = st.tabs(['Rank vs. Size', 'PDF', 'HHI'])
     with tabs[0]:
         st.plotly_chart(fig)
-        fig.write_json('tmp/rank_size.json')
+        # fig.write_json('tmp/rank_size.json')
     with tabs[1]:
         pdf = data.groupby(groupby)[column].apply(get_hist).reset_index()
         pdf = pdf.pivot(index=groupby, columns='level_1', values=column).reset_index().explode(['hist', 'bin_edges'])
@@ -110,7 +110,7 @@ with right:
             if trace.mode == 'lines':
                 trace.line.dash = 'dot'
         st.plotly_chart(pdf_fig)
-        pdf_fig.write_json('tmp/pdf.json')
+        # pdf_fig.write_json('tmp/pdf.json')
         st.caption('Note: 50 bins for each group')
         if pl_fit:
             pdf_2nd = data_2nd.groupby(groupby)[column].apply(get_hist).reset_index()
@@ -129,7 +129,7 @@ with right:
         hhi = data.groupby(groupby)[column].apply(lambda x: ((x / x.sum())**2).sum() * 10000).reset_index()
         hhi_fig = px.scatter(hhi, x=groupby, y=column)
         st.plotly_chart(hhi_fig)
-        hhi.to_csv('tmp/hhi.csv', index=False)
+        # hhi.to_csv('tmp/hhi.csv', index=False)
 
     ols_results = px.get_trendline_results(ols_fig)
     if groupby == '':
