@@ -38,6 +38,22 @@ def get_hist(x):
     hist, bin_edges = np.histogram(x, bins=log_bins, density=True)
     return pd.Series({'hist': hist, 'bin_edges': bin_edges[:-1]})
 
+def get_ccdf(x):
+    x = pd.to_numeric(x, errors='coerce').dropna().to_numpy()
+    x = x[x > 0]
+    if x.size == 0:
+        return pd.Series({'ccdf': np.array([]), 'bin_edges': np.array([])})
+
+    log_bins = np.logspace(np.log10(x.min()), np.log10(x.max()), 50)
+    thresholds = log_bins[:-1]  # match your PDF x-axis convention
+
+    xs = np.sort(x)
+    n = xs.size
+    idx = np.searchsorted(xs, thresholds, side='left')
+    ccdf = (n - idx) / n  # P(X >= threshold)
+
+    return pd.Series({'ccdf': ccdf, 'bin_edges': thresholds})
+
 
 left, right = st.columns(2)
 
@@ -127,7 +143,7 @@ with right:
                 trace.line.dash = 'dot'
                 rank_fig.add_trace(trace)
 
-    tabs_main = st.tabs(['Rank vs. Size', 'PDF', 'HHI'])
+    tabs_main = st.tabs(['Rank vs. Size', 'PDF', 'CCDF', 'HHI'])
     with tabs_main[0]:
         st.plotly_chart(rank_fig)
 
@@ -175,8 +191,57 @@ with right:
             st.plotly_chart(pdf_fig_2nd)
             st.caption('Note: 2nd fit is only for the data above the xmin of the 1st fit')
 
-    # --- HHI tab ---
+    # --- CCDF tab ---
     with tabs_main[2]:
+        ccdf = data.groupby(groupby)[column].apply(get_ccdf).reset_index()
+        ccdf = ccdf.pivot(index=groupby, columns='level_1', values=column).reset_index() \
+                .explode(['ccdf', 'bin_edges'])
+        ccdf = ccdf[ccdf['ccdf'] > 0]
+
+        ccdf_fig = px.scatter(
+            ccdf,
+            x='bin_edges',
+            y='ccdf',
+            color=groupby,
+            log_x=True,
+            log_y=True,
+            trendline='ols',
+            trendline_options=dict(log_x=True, log_y=True),
+            labels={'ccdf': 'P(X ≥ x)', 'bin_edges': column}
+        )
+        for trace in ccdf_fig.data:
+            if trace.mode == 'lines':
+                trace.line.dash = 'dot'
+
+        st.plotly_chart(ccdf_fig)
+        st.caption('Note: 50 log-spaced thresholds per group; y is empirical P(X ≥ x).')
+
+        if pl_fit and data_2nd is not None and not data_2nd.empty:
+            ccdf_2nd = data_2nd.groupby(groupby)[column].apply(get_ccdf).reset_index()
+            ccdf_2nd = ccdf_2nd.pivot(index=groupby, columns='level_1', values=column).reset_index() \
+                            .explode(['ccdf', 'bin_edges'])
+            ccdf_2nd = ccdf_2nd[ccdf_2nd['ccdf'] > 0]
+
+            ccdf_fig_2nd = px.scatter(
+                ccdf_2nd,
+                x='bin_edges',
+                y='ccdf',
+                color=groupby,
+                log_x=True,
+                log_y=True,
+                trendline='ols',
+                trendline_options=dict(log_x=True, log_y=True),
+                labels={'ccdf': 'P(X ≥ x)', 'bin_edges': column}
+            )
+            for trace in ccdf_fig_2nd.data:
+                if trace.mode == 'lines':
+                    trace.line.dash = 'dot'
+
+            st.plotly_chart(ccdf_fig_2nd)
+            st.caption('Note: 2nd fit is only for the data above the xmin of the 1st fit')
+
+    # --- HHI tab ---
+    with tabs_main[3]:
         hhi = data.groupby(groupby)[column].apply(lambda x: ((x / x.sum())**2).sum() * 10000).reset_index()
         hhi_fig = px.scatter(hhi, x=groupby, y=column)
         st.plotly_chart(hhi_fig)
@@ -271,6 +336,7 @@ with right:
     with col_dl1:
         download_plotly_json(rank_fig, "Download Rank vs Size", "rank_vs_size.json")
         download_plotly_json(pdf_fig, "Download PDF", "pdf.json")
+        download_plotly_json(ccdf_fig, "Download CCDF", "ccdf.json")
         download_plotly_json(hhi_fig, "Download HHI", "hhi.json")
 
     with col_dl2:
